@@ -41,10 +41,11 @@ export default Mixin.create({
     let fastboot = this.get('fastboot');
     let isFastboot = fastboot && fastboot.get('isFastBoot');
     let cache = this.get('storefront.fastbootDataRequests');
-
+    let extraCacheKeyProps = this.extraCacheKeyProps && this.extraCacheKeyProps();
+    let includeInCache = !this._isExclusion(url, this.excludeFromFastbootCache);
     return function(response) {
-      if (isFastboot) {
-        let key = shoeboxize(cacheKey([type, url, params]));
+      if (isFastboot && includeInCache) {
+        let key = shoeboxize(cacheKey([type, url, params, extraCacheKeyProps]));
         cache[key] = JSON.stringify(response);
       }
 
@@ -58,14 +59,32 @@ export default Mixin.create({
     let isFastboot = fastboot && fastboot.get('isFastBoot');
     let shoebox = fastboot && fastboot.get('shoebox');
     let box = shoebox && shoebox.retrieve('ember-data-storefront');
+    let extraCacheKeyProps = this.extraCacheKeyProps && this.extraCacheKeyProps();
 
     if (!isFastboot && box && box.queries && Object.keys(box.queries).length > 0) {
-      let key = shoeboxize(cacheKey([type, url, params]));
+      let key = shoeboxize(cacheKey([type, url, params, extraCacheKeyProps]));
       payload = box.queries[key];
       delete box.queries[key];
     }
 
     return payload;
+  },
+
+  _isExclusion(url, excludeList) {
+    if (!Array.isArray(excludeList)) {
+      return false;
+    }
+    return excludeList.reduce(function (previous, currentEntry) {
+      if (currentEntry[0] === '/' &&
+        currentEntry.slice(-1) === '/') {
+        // RegExp as string
+        var regexp = new RegExp(currentEntry.slice(1, -1));
+        return previous || regexp.test(url);
+      }
+      else {
+        return previous || currentEntry === url;
+      }
+    }, false);  
   }
 
 })
